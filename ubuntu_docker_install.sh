@@ -1,11 +1,32 @@
 #!/bin/bash
 
-# This script automates the installation of Docker and Docker Compose on Ubuntu.
-# It follows the official Docker installation guide.
+# This script automates the installation of Docker and Docker Compose.
+# It supports both Ubuntu and Debian OS by auto-detecting the distribution.
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
 echo "--- Starting Docker Installation Script ---"
+
+# 0. PRE-FLIGHT CHECK
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    CODENAME=$VERSION_CODENAME
+else
+    echo "Error: /etc/os-release not found. Cannot detect OS."
+    exit 1
+fi
+
+echo "Detected OS: $OS"
+echo "Detected Codename: $CODENAME"
+
+if [[ "$OS" != "ubuntu" && "$OS" != "debian" ]]; then
+    echo "Error: This script is designed for 'ubuntu' or 'debian' only."
+    echo "Your detected OS ID is: $OS"
+    exit 1
+fi
+
+echo "----------------------------------------"
 
 # 1. UNINSTALL OLDER VERSIONS
 echo "[Step 1/6] Uninstalling old Docker versions..."
@@ -20,7 +41,7 @@ echo "Old versions removed."
 echo "----------------------------------------"
 
 # 2. SET UP THE REPOSITORY
-echo "[Step 2/6] Setting up Docker's APT repository..."
+echo "[Step 2/6] Setting up Docker's APT repository for $OS..."
 # Update the apt package index and install packages to allow apt to use a repository over HTTPS
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl
@@ -30,15 +51,18 @@ sudo install -m 0755 -d /etc/apt/keyrings
 if [ -f /etc/apt/keyrings/docker.asc ]; then
     sudo rm /etc/apt/keyrings/docker.asc
 fi
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+
+# Dynamically download the key based on the OS ($OS is either ubuntu or debian)
+sudo curl -fsSL https://download.docker.com/linux/$OS/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 
 # Set up the repository
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS \
+  $CODENAME stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-echo "Repository setup complete."
+
+echo "Repository setup complete for $OS ($CODENAME)."
 echo "----------------------------------------"
 
 # 3. INSTALL DOCKER ENGINE
